@@ -6,6 +6,7 @@ __pycache__/
 # Ignore environment and secret config files
 .env
 service_account.json
+secrets.toml
 
 # Ignore virtual environment folders
 venv/
