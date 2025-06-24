@@ -1,4 +1,6 @@
 import os
+import json
+import streamlit as st
 from dotenv import load_dotenv
 
 load_dotenv()
@@ -10,16 +12,20 @@ TIMEOUT = 15
 BATCH_SIZE = 15
 
 # Gemini Config
-GEMINI_API_KEY = os.getenv("GEMINI_API_KEY")
+GEMINI_API_KEY = st.secrets["GEMINI_API_KEY"]
 MODEL_NAME = "gemini-1.5-flash"
 MAX_RETRIES = 3
 RETRY_DELAY = 5
 
 # Google Sheets Config
-SERVICE_ACCOUNT_FILE = os.getenv("GOOGLE_SERVICE_ACCOUNT_FILE")
 SHARE_EMAIL = os.getenv("SHARE_EMAIL")
 SHEET_TITLE = os.getenv("SHEET_TITLE")
 SCOPES = [
     "https://www.googleapis.com/auth/spreadsheets",
     "https://www.googleapis.com/auth/drive"
 ]
+
+SERVICE_ACCOUNT_FILE = "service_account.json"
+
+with open(SERVICE_ACCOUNT_FILE, "w") as f:
+    json.dump(json.loads(st.secrets["SERVICE_ACCOUNT_JSON"]), f)
