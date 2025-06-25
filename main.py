@@ -26,7 +26,7 @@ def batch_process(site_url: str, username: str, application_password: str, email
     # Step 2: Get WordPress page IDs
     logger.info("Mapping URLs to page IDs...")
     page_ids = wp_service.get_page_ids(urls)
-    
+
     # Step 3: Process in batches
     results = []
     total_urls = len(urls)
@@ -217,7 +217,7 @@ def show_progress():
 
 # Step 1: Website URL
 def step_website():
-    st.title("Website Information")
+    st.title("Website Info")
     show_progress()
     
     with st.container():

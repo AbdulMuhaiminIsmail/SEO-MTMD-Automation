@@ -47,11 +47,14 @@ Format:
   }}
 }}
 
-Follow these guidelines:
-- Use brackets and numbers to increase CTR
-- Keep descriptions 150-160 characters
-- Include CTAs like "Learn more", "Discover"
-- Use powerful words: "proven", "guaranteed"
+Follow these tips from now for meta title
+Using brackets increases CTR by 38%.
+Using numbers increases CTR by 36%.
+Use provoking words from paid Google ads, e.g., free shipping, discounts, etc.
+For meta description
+ Keep the length between 150-160 characters (920 pixels)
+ Add a Call-To-Action. ("Learn more", "Discover more", "Find out", "Get it", "Start now", "Unlock now")
+ Add Powerful and Emotional Words. ("proven", "guaranteed", "revolutionary", "exclusive", "essential")
 """
     
     def _parse_response(self, response_text: str, urls: List[str]) -> Dict[str, Tuple[str, str]]:

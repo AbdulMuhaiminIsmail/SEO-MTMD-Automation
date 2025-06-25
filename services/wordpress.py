@@ -46,6 +46,8 @@ class WordPressService:
         endpoint = f"{self.wp_site}/wp-json/wp/v2/pages?per_page=100"
         
         try:
+            print("Username: ", self.wp_username)
+            print("Password: ", self.wp_application_password)
             response = requests.get(endpoint, auth=self.auth, timeout=TIMEOUT)
             response.raise_for_status()
             

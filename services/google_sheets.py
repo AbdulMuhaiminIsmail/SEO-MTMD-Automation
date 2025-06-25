@@ -28,6 +28,7 @@ class GoogleSheetsService:
         """Create Google Sheet with data and return URLs"""
         try:
             self.spreadsheet = self.client.create(SHEET_TITLE)
+            print("Spreadsheet being shared with: ", self.email)
             self.spreadsheet.share(self.email, perm_type="user", role="writer")
 
             worksheet = self.spreadsheet.sheet1
