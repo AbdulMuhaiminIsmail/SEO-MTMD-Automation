@@ -1,3 +1,4 @@
+import time
 import gspread
 from google.oauth2.service_account import Credentials
 from typing import List, Dict
@@ -12,7 +13,7 @@ class GoogleSheetsService:
             cls._instance = super(GoogleSheetsService, cls).__new__(cls)
         return cls._instance
 
-    def __init__(self, email=None):
+    def __init__(self):
         if hasattr(self, "_initialized") and self._initialized:
             return  # Skip re-initialization
 
@@ -20,19 +21,18 @@ class GoogleSheetsService:
             SERVICE_ACCOUNT_FILE, scopes=SCOPES
         )
         self.client = gspread.authorize(self.creds)
-        self.email = email
         self.spreadsheet = None
         self._initialized = True  # Flag to avoid re-running __init__
 
-    def create_sheet(self, data: List[Dict]) -> Dict[str, str]:
+    def create_sheet(self, data: List[Dict]) -> object:
         """Create Google Sheet with data and return URLs"""
         try:
+            time.sleep(1)
             self.spreadsheet = self.client.create(SHEET_TITLE)
-            print("Spreadsheet being shared with: ", self.email)
-            self.spreadsheet.share(self.email, perm_type="user", role="writer")
+            time.sleep(1)
 
             worksheet = self.spreadsheet.sheet1
-            worksheet.update_title("Meta-Updates")
+            worksheet.update_title("Metadata")
 
             # Prepare headers and data
             headers = ["post_id", "post_type", "_yoast_wpseo_title", "_yoast_wpseo_metadesc", "url"]
@@ -43,24 +43,18 @@ class GoogleSheetsService:
 
             worksheet.update(rows)
 
-            return {
-                "view_url": f"https://docs.google.com/spreadsheets/d/{self.spreadsheet.id}",
-                "csv_url": (
-                    f"https://docs.google.com/spreadsheets/d/{self.spreadsheet.id}/"
-                    f"gviz/tq?tqx=out:csv&sheet={worksheet.title}"
-                )
-            }
+            return self.spreadsheet
         except Exception as e:
             logger.error(f"Google Sheets error: {str(e)}")
             raise
 
-    def remove_urls(self):
+    def remove_urls(self, spreadsheet):
         """Delete the 'url' column (Column E / index 5) from the current spreadsheet"""
         try:
-            if not self.spreadsheet:
+            if not spreadsheet:
                 raise Exception("Spreadsheet not initialized. Call create_sheet() first.")
 
-            worksheet = self.spreadsheet.sheet1
+            worksheet = spreadsheet.sheet1
             worksheet.delete_columns(5)
             logger.info("URL column removed successfully.")
         except Exception as e:

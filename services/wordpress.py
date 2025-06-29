@@ -4,6 +4,8 @@ import xml.etree.ElementTree as ET
 from typing import Dict, List
 from config import TIMEOUT
 from utils.logger import logger
+from bs4 import BeautifulSoup
+import re
 
 class WordPressService:
     def __init__(self, wp_site, wp_username, wp_application_password):
@@ -40,22 +42,61 @@ class WordPressService:
                     urls.append(loc.text.rstrip('/'))
         return urls
     
-    def get_page_ids(self, urls: List[str]) -> Dict[str, int]:
-        """Get WordPress page IDs for a list of URLs"""
+    def get_page_ids_and_about_us_content(self, urls: List[str]) -> Dict[str, int]:
+        """Get WordPress page IDs for a list of URLs (with pagination) and about us page content"""
+        cleaned_text = ""
         page_ids = {}
-        endpoint = f"{self.wp_site}/wp-json/wp/v2/pages?per_page=100"
-        
+        page = 1
+
         try:
-            print("Username: ", self.wp_username)
-            print("Password: ", self.wp_application_password)
-            response = requests.get(endpoint, auth=self.auth, timeout=TIMEOUT)
-            response.raise_for_status()
-            
-            for page in response.json():
-                clean_url = page['link'].rstrip('/')
-                if clean_url in urls:
-                    page_ids[clean_url] = page['id']
+            while True:
+                endpoint = f"{self.wp_site}/wp-json/wp/v2/pages?per_page=100&page={page}"
+                response = requests.get(endpoint, auth=self.auth, timeout=TIMEOUT)
+                response.raise_for_status()
+                
+                data = response.json()
+                if not data:
+                    break  # No more pages
+
+                for page_data in data:
+                    if "about" in page_data['link'].lower() or "about" in page_data['slug'].lower():
+                        raw_html = page_data['content']['rendered']
+                        cleaned_text = self.clean_about_us_text(raw_html)
+                    clean_url = page_data['link'].rstrip('/')
+                    if clean_url in urls:
+                        page_ids[clean_url] = page_data['id']
+
+                page += 1
+
         except Exception as e:
             logger.error(f"Page ID fetch error: {str(e)}")
-        
-        return page_ids
+
+        return page_ids, cleaned_text
+    
+    def clean_about_us_text(self, raw_html: str) -> str:
+        soup = BeautifulSoup(raw_html, "html.parser")
+
+        # Extract text
+        text = soup.get_text(separator="\n", strip=True)
+
+        # Remove non-printable characters & unusual symbols
+        text = re.sub(r"[^\x20-\x7E\n]+", "", text)
+
+        # Remove excessive newlines
+        text = re.sub(r"\n{2,}", "\n", text)
+
+        # Remove promotional calls to action
+        unwanted_phrases = [
+            "Claim Your Lead Now!", 
+            "Send Message", 
+            "You agree to our friendly terms", 
+            "Get Started",
+            "Support",
+            "Testimonial",
+            "What they say about us"
+        ]
+
+        for phrase in unwanted_phrases:
+            text = text.replace(phrase, "")
+
+        return text
