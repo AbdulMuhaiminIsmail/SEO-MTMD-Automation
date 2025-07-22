@@ -1,4 +1,5 @@
 import time
+import pandas as pd
 import streamlit as st
 from services.wordpress import WordPressService
 from services.openai_service import OpenAIService
@@ -148,13 +149,12 @@ if 'completed' not in st.session_state:
 if 'error' not in st.session_state:
     st.session_state.error = None
 
-def batch_process(site_url: str, username: str, application_password: str, email: str):
+def batch_process(site_url: str, username: str, application_password: str):
     """Main processing pipeline"""
     logger.info("Starting meta generation process")
     
     # Initialize services
     gpt = OpenAIService()
-    sheets = GoogleSheetsService()
     wp_service = WordPressService(site_url, username, application_password)
     
     # Step 1: Fetch all pages
@@ -189,8 +189,9 @@ def batch_process(site_url: str, username: str, application_password: str, email
             results.append({
                 "post_id": page_ids.get(url, "N/A"),
                 "url": url,
-                "title": title,
-                "description": desc
+                "post_type": "page",
+                "_yoast_wpseo_title": title,
+                "_yoast_wpseo_metadesc": desc
             })
         
         # Rate limiting (adjust based on gpt's rate limits)
@@ -198,26 +199,18 @@ def batch_process(site_url: str, username: str, application_password: str, email
             time.sleep(1)  # Small delay between batches
     
     # Step 5: Create Google Sheet
-    logger.info("Creating Google Sheet...")
-    spreadsheet = sheets.create_sheet(results)
-    logger.info(f"Spreadsheet being shared with: {email}")
-    spreadsheet.share(email, perm_type="user", role="writer")
-    logger.info("Process completed successfully!")
+    logger.info("Creating CSV File...")
 
-    st.session_state.spreadsheet = spreadsheet
+    df = pd.DataFrame(results)
+    df = df[["post_id", "post_type", "_yoast_wpseo_title", "_yoast_wpseo_metadesc", "url"]]
+    csv = df.to_csv(index=False).encode('utf-8')
+    
+    logger.info("CSV created successfully!")
 
-    sheet_urls = {
-        "view_url": f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}",
-        "csv_url": (
-            f"https://docs.google.com/spreadsheets/d/{spreadsheet.id}/"
-            f"gviz/tq?tqx=out:csv&sheet={spreadsheet.sheet1.title}"
-        )
-    }
-
-    return sheet_urls
+    return csv
 
 def show_progress():
-    progress = (st.session_state.current_step - 1) / 4
+    progress = (st.session_state.current_step - 1) / 3
     st.markdown(f"""
     <div class="progress-container">
         <div class="progress-bar" style="width: {progress*100}%"></div>
@@ -365,9 +358,6 @@ def step_review():
         st.subheader("WordPress Username")
         st.write(st.session_state.form_data.get('username', ''))
         
-        st.subheader("Email Address")
-        st.write(st.session_state.form_data.get('email', ''))
-        
         st.markdown('</div>', unsafe_allow_html=True)
         
         col1, col2 = st.columns(2)
@@ -393,15 +383,13 @@ def step_processing():
         
         try:
             form_data = st.session_state.form_data
-            sheet_urls = batch_process(
+            csv = batch_process(
                 site_url=form_data["website_url"],
                 username=form_data["username"],
-                application_password=form_data["app_password"],
-                email=form_data["email"]
+                application_password=form_data["app_password"]
             )
             
-            st.session_state.sheet_url = sheet_urls["view_url"]
-            st.session_state.csv_url = sheet_urls["csv_url"]
+            st.session_state.csv = csv
             st.session_state.processing = False
             st.session_state.completed = True
             st.rerun()
@@ -419,20 +407,12 @@ def step_results():
     show_progress()
     
     with st.container():
-        
         st.header("Your meta data is ready")
+        st.write("You can now view and edit the generated meta titles and descriptions from the CSV:")
         
-        st.write("You can now view or edit the generated meta titles and descriptions:")
+        cols = st.columns(1)
         
-        col1, col2 = st.columns(2, gap='large')
-        
-        with col1:
-            if st.button("View Google Sheet"):
-                st.markdown(f"[Open in new tab]({st.session_state.sheet_url})", unsafe_allow_html=True)
-        
-        st.markdown('</div>', unsafe_allow_html=True)
-        
-        with col2:
+        with cols[0]:
             if st.button("Continue to Download"):
                 st.session_state.current_step = 5
                 st.rerun()
@@ -440,19 +420,22 @@ def step_results():
 def step_download():
     st.title("Download Results")
     show_progress()
-
+    
     with st.container():
-        st.header("Download your data")
-        st.write("You can download the CSV file with all generated metadata:")
-
-        col1, col2 = st.columns(2, gap='large')
-
-        with col1:
-            if st.button("Download CSV"):
-                GoogleSheetsService().remove_urls(st.session_state.spreadsheet)
-                st.markdown(f"[Download CSV]({st.session_state.csv_url})", unsafe_allow_html=True)
+        st.header("Download your data")    
+        st.write("You can download the CSV file with all generated meta data:")
         
-        with col2:     
+        col1, col2 = st.columns(2, gap='large')
+        
+        with col1:
+            st.download_button(
+                label="📥 Download Meta CSV",
+                data=st.session_state.csv,
+                file_name="meta_data.csv",
+                mime="text/csv"
+            )
+        
+        with col2:       
             if st.button("Start New Request"):
                 st.session_state.current_step = 1
                 st.session_state.form_data = {}
@@ -476,6 +459,4 @@ else:
     elif st.session_state.current_step == 2:
         step_credentials()
     elif st.session_state.current_step == 3:
-        step_email()
-    elif st.session_state.current_step == 4:
         step_review()
